@@ -1,0 +1,9 @@
+apiVersion: v2
+name: future
+description: Placeholder for the next core infra component — add a dependency + values here.
+type: application
+
+# Version of THIS wrapper chart (bump on any change here).
+version: 0.1.0
+
+# No appVersion / dependencies yet — this is an intentionally empty placeholder.

@@ -1,0 +1,44 @@
+# =============================================================================
+# Host-less Ingress for the Argo CD server, on the self-managed 'alb' IngressClass.
+#
+# We ship this ourselves because the argo-cd 10.0.0 chart's server.ingress block
+# hard-codes a `host:` (it falls back to global.domain) and cannot render a truly
+# host-less rule — so the chart Ingress is disabled in values.yaml. A rule with NO
+# `host:` key matches any Host header, so Argo CD is reachable directly at the ALB
+# DNS name (no Route53/ACM wired yet).
+#
+# Backend service name assumes the release is installed as `argocd` (=> Service
+# `argocd-server`). The IngressClass `alb` is created by the alb chart.
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    # Internet-facing (public) ALB.
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Register pod IPs directly (recommended on EKS Auto Mode).
+    alb.ingress.kubernetes.io/target-type: ip
+    # Single HTTP:80 listener (add HTTPS:443 once ACM is configured).
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    # ALB -> argocd-server over plain HTTP (server.insecure=true).
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    # ALB target health check against the Argo CD server health endpoint.
+    # Use "/healthz?full=true" for a deeper readiness check if desired.
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/success-codes: "200"
+spec:
+  ingressClassName: alb
+  rules:
+    # No `host:` key => matches any Host header (resolve via the ALB DNS name).
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80

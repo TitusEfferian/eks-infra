@@ -1,0 +1,7 @@
+apiVersion: v2
+name: apps
+description: App-of-apps payload — renders the Argo CD Application CRs (alb, future, optionally argocd) that the 'infra-root' root Application syncs from git. Kept separate from the argocd chart so sync waves are honored (children are synced by a parent Application, not applied all at once by Helm).
+type: application
+
+# Version of THIS chart (bump on any change here).
+version: 0.1.0

@@ -1,0 +1,44 @@
+{{- if .Values.selfManage }}
+# =============================================================================
+# argocd — SELF-MANAGEMENT (advanced / opt-in via .Values.selfManage).
+# Argo CD manages the very release that bootstrapped it. Sync wave -1 so it
+# reconciles before the other apps. Differences from the other apps:
+#   - automated.prune is FALSE (never let Argo prune its own components), and
+#   - ignoreDifferences on Secret/argocd-secret /data so Argo does not fight the
+#     server-generated admin/session/signing keys stored there.
+# Only enable once argocd/values.yaml in git matches the installed release.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project }}
+  source:
+    repoURL: {{ .Values.repo.url | quote }}
+    targetRevision: {{ .Values.repo.targetRevision }}
+    path: argocd
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: argocd-secret
+      jsonPointers:
+        - /data
+{{- end }}

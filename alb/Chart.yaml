@@ -1,0 +1,17 @@
+apiVersion: v2
+name: alb
+description: Standalone AWS Load Balancer Controller (chart 3.4.0 / v3.4.0) for the tituseff-playground EKS Auto Mode cluster. Owns a dedicated non-default 'alb' IngressClass; isolated from Auto Mode's built-in LB.
+type: application
+
+# Version of THIS wrapper chart (bump on any change here).
+version: 0.1.0
+
+# Mirrors the pinned aws-load-balancer-controller release shipped by the subchart.
+appVersion: "v3.4.0"
+
+dependencies:
+  - name: aws-load-balancer-controller
+    version: "3.4.0"
+    repository: "https://aws.github.io/eks-charts"
+    # Overrides nest under this alias in values.yaml.
+    alias: lbc

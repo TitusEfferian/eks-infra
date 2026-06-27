@@ -1,0 +1,11 @@
+# =============================================================================
+# Placeholder values for the `future` chart.
+#
+# This chart is intentionally empty. When you add the next core infra component:
+#   1. Declare its chart as a dependency in Chart.yaml (name/version/repository,
+#      optionally an alias), then run `helm dependency build`.
+#   2. Add the override values for that dependency here (nested under its name or
+#      alias, mirroring how alb/values.yaml nests under `lbc:`).
+#   3. The `future` Argo CD Application already exists (apps/templates/app-future.yaml),
+#      so once you populate this chart and push, the root app deploys it via GitOps.
+# =============================================================================
