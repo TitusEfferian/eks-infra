@@ -1,16 +1,26 @@
 # =============================================================================
 # Dedicated, NON-default 'alb' IngressClass for the self-managed controller.
 #
-# We own this (rather than letting the subchart create it) so that:
-#   - it is explicitly NOT the cluster default (no
-#     ingressclass.kubernetes.io/is-default-class annotation), keeping it
-#     isolated from EKS Auto Mode's built-in eks.amazonaws.com/alb class; and
-#   - its spec.controller is ingress.k8s.aws/alb (this controller), so only
-#     Ingresses with `ingressClassName: alb` are reconciled here.
+#   - spec.controller is ingress.k8s.aws/alb, so ONLY Ingresses with
+#     `ingressClassName: alb` are reconciled by THIS controller — isolated from
+#     EKS Auto Mode's built-in eks.amazonaws.com/alb class.
+#   - It is intentionally NOT the cluster default (no
+#     ingressclass.kubernetes.io/is-default-class annotation), so a class-less
+#     Ingress is never auto-claimed by either controller.
 #
-# The IngressClassParams CRD (elbv2.k8s.aws) is installed by the
-# aws-load-balancer-controller subchart's crds/ on `helm install`, so this
-# renders against an existing CRD.
+# We deliberately DO NOT attach an IngressClassParams. Creating an
+# IngressClassParams during `helm install` calls the controller's validating
+# webhook (vingressclassparams.elbv2.k8s.aws), which has NO endpoints until the
+# controller pod is Ready. On a fresh EKS Auto Mode cluster (scale-from-zero cold
+# start) that races and fails the install with:
+#   "no endpoints available for service lbc-webhook-service".
+#
+# Everything we need (scheme, target-type, listen-ports, health check) is set via
+# alb.ingress.kubernetes.io/* annotations on the Ingress itself (see
+# eks-infra/argocd/templates/argocd-server-ingress.yaml), so params are redundant
+# here. If you later want class-level enforced defaults, add an IngressClassParams
+# as a SEPARATE step AFTER the controller is Ready (a post-bootstrap kubectl apply
+# or a later Argo CD sync-wave) — never bundled into this chart's initial install.
 # =============================================================================
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
@@ -18,19 +28,3 @@ metadata:
   name: alb
 spec:
   controller: ingress.k8s.aws/alb
-  parameters:
-    apiGroup: elbv2.k8s.aws
-    kind: IngressClassParams
-    name: alb
-    scope: Cluster
----
-# Cluster-scoped defaults applied to every Ingress on the 'alb' class. Per-Ingress
-# alb.ingress.kubernetes.io/* annotations (e.g. on the Argo CD server Ingress)
-# still apply on top of these.
-apiVersion: elbv2.k8s.aws/v1beta1
-kind: IngressClassParams
-metadata:
-  name: alb
-spec:
-  scheme: internet-facing
-  ipAddressType: ipv4
