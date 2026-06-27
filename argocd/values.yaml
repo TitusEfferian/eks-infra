@@ -1,0 +1,99 @@
+# =============================================================================
+# Overrides for the argo-cd subchart (chart 10.0.0 / appVersion v3.4.4).
+# Everything nested under `argo-cd:` is passed straight through to the
+# dependency declared in Chart.yaml. Defaults not set here come from the
+# upstream chart's values.yaml.
+# =============================================================================
+argo-cd:
+
+  # --- Global ----------------------------------------------------------------
+  global:
+    # Left empty: we expose Argo CD via our OWN host-less Ingress
+    # (templates/argocd-server-ingress.yaml), not the chart's. Set to a real FQDN
+    # only once you add DNS + TLS.
+    domain: ""
+
+  # --- CRDs ------------------------------------------------------------------
+  # The argo-cd chart TEMPLATES its CRDs (so `helm upgrade` updates them in place,
+  # unlike the LBC chart's install-only crds/). Keep them on upgrade & uninstall.
+  crds:
+    install: true
+    keep: true
+
+  # --- argocd-cmd-params-cm (free-form map) ----------------------------------
+  configs:
+    params:
+      # Serve the API/UI over plain HTTP so the HTTP:80 ALB can reach the
+      # backend without TLS. Required for this no-ACM ALB setup.
+      server.insecure: true
+
+  # --- Lean / NON-HA topology ------------------------------------------------
+  # Disable Dex (SSO) — initial access is the built-in admin user only.
+  dex:
+    enabled: false
+
+  # Bundled single-instance Redis (non-HA). redis-ha stays disabled by default.
+  redis:
+    enabled: true
+
+  # Application controller: single replica + modest requests.
+  controller:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+
+  # API/UI server: single replica, modest requests, no autoscaling. The chart's
+  # own Ingress is DISABLED — its 10.0.0 template hard-codes a `host:` (falling
+  # back to global.domain) and cannot render a truly host-less rule, so we ship
+  # our own in templates/argocd-server-ingress.yaml instead.
+  server:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    autoscaling:
+      enabled: false
+    ingress:
+      enabled: false
+
+  # Repo server: single replica, modest requests, no autoscaling.
+  repoServer:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    autoscaling:
+      enabled: false
+
+  # ApplicationSet controller: single replica, modest requests.
+  applicationSet:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+# =============================================================================
+# app-of-apps wiring (OUR OWN values — not part of the argo-cd subchart).
+# Consumed by templates/appproject.yaml and templates/app-root.yaml.
+#
+# Bootstrap behaviour:
+#   - repo.url EMPTY (default): installing this chart creates Argo CD + the
+#     `infra` AppProject + our server Ingress only. The root app is NOT rendered.
+#   - repo.url SET to your pushed remote (then `helm upgrade`): the 'infra-root'
+#     Application is created and syncs the `apps` chart from git, which in turn
+#     creates the alb (wave 0) and future (wave 1) Applications.
+# =============================================================================
+
+# Git remote that holds THIS eks-infra repo. You MUST set this (and `helm upgrade`)
+# to activate GitOps. Argo CD reads each app's chart path from here.
+repo:
+  url: ""
+  targetRevision: main
+
+# Argo CD AppProject the root app and its children belong to.
+project: infra

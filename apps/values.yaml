@@ -1,0 +1,22 @@
+# =============================================================================
+# Values for the `apps` chart (the app-of-apps payload).
+#
+# In normal operation these are NOT edited here: the 'infra-root' Application in
+# the argocd chart renders this chart from git and injects repo.url +
+# repo.targetRevision via helm parameters. The defaults below are only used if you
+# render this chart directly (e.g. `helm template apps .`).
+# =============================================================================
+
+# Git remote + revision this repo lives at. Injected by the root app at sync time.
+repo:
+  url: ""
+  targetRevision: main
+
+# Argo CD AppProject the child Applications belong to. Must match the AppProject
+# created by the argocd chart (argocd/values.yaml `project`). Default: infra.
+project: infra
+
+# Self-management: render the `argocd` child Application (Argo CD managing the very
+# release that bootstrapped it). Advanced / opt-in — see apps/templates/app-argocd.yaml
+# and argocd/README.md. Toggle this in git, then let the root app sync it.
+selfManage: false

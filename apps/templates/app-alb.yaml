@@ -1,0 +1,34 @@
+# =============================================================================
+# alb — Argo CD Application for the standalone AWS Load Balancer Controller chart.
+# Sync wave 0: the LBC must be Healthy before anything that needs an ALB (e.g. the
+# Argo CD server Ingress). Adopts the release first created by `helm install alb`.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alb
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  # Cascade-delete the managed resources if this Application is deleted.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project }}
+  source:
+    repoURL: {{ .Values.repo.url | quote }}
+    targetRevision: {{ .Values.repo.targetRevision }}
+    path: alb
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

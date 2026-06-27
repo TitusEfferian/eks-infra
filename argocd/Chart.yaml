@@ -1,0 +1,17 @@
+apiVersion: v2
+name: argocd
+description: Umbrella chart that deploys Argo CD (GitOps continuous delivery) onto the tituseff-playground EKS Auto Mode cluster, exposed via the self-managed AWS Load Balancer Controller ALB. Also renders the app-of-apps CRs that bootstrap GitOps for the eks-infra repo.
+type: application
+
+# Version of THIS umbrella chart (bump on any change here).
+version: 0.1.0
+
+# Mirrors the pinned Argo CD release shipped by the argo-cd subchart below.
+appVersion: "v3.4.4"
+
+dependencies:
+  - name: argo-cd
+    # Pinned to the current argo-helm release (appVersion v3.4.4).
+    # No alias: overrides nest under `argo-cd:` in values.yaml.
+    version: "10.0.0"
+    repository: https://argoproj.github.io/argo-helm
