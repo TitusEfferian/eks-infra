@@ -1,8 +1,9 @@
-# argocd — Argo CD + app-of-apps bootstrap
+# argocd — Argo CD (app-of-apps bootstrapped separately)
 
 Umbrella chart around `argo/argo-cd` (chart **10.0.0** / appVersion **v3.4.4**)
-for the `tituseff-playground` EKS Auto Mode cluster, plus the CRs that bootstrap
-GitOps for this repo.
+for the `tituseff-playground` EKS Auto Mode cluster. It installs **Argo CD plus a
+host-less server Ingress only** — the app-of-apps Argo CD resources live in
+`../bootstrap.yaml`.
 
 - Argo CD is **non-HA** (single replicas, autoscaling off), `server.insecure=true`,
   exposed via an **internet-facing HTTP:80 ALB** (no ACM/TLS). See `values.yaml`
@@ -12,46 +13,40 @@ GitOps for this repo.
   `global.domain`) and cannot render a truly host-less rule. We ship our own
   host-less Ingress in `templates/argocd-server-ingress.yaml` (class `alb`,
   HTTP:80, target-type ip, health check `/healthz`).
-- `templates/appproject.yaml` renders the `infra` `AppProject`.
-- `templates/app-root.yaml` renders the `infra-root` **root** Application — but
-  only once `repo.url` is set (it is guarded). It points at the `apps/` chart,
-  which renders the child Applications (`alb`, `future`, optionally `argocd`).
-
-All CRs are created in the Argo CD install namespace (`.Release.Namespace`,
-normally `argocd`) because the controller only watches its own namespace by default.
+- **No `AppProject`/`Application` here.** Those are Argo CD CRs, and Helm cannot
+  create a CR whose CRD is installed by the *same* release ("no matches for kind
+  AppProject … ensure CRDs are installed first"). They live in `../bootstrap.yaml`,
+  applied with `kubectl apply` **after** this chart is installed.
 
 ## Install
+
+Ensure the ALB controller (`../alb`) is **Ready** first — this chart's
+`argocd-server` Ingress is reconciled by it.
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update
 helm dependency build .          # vendors argo-cd-10.0.0.tgz into charts/
 helm upgrade --install argocd . -n argocd --create-namespace
+kubectl -n argocd rollout status deploy/argocd-server
 ```
 
-With `repo.url` empty this installs Argo CD + the `infra` AppProject + the
-host-less Ingress only (no root app). Then activate GitOps:
-
-```yaml
-# values.yaml
-repo:
-  url: "https://github.com/<you>/eks-infra.git"
-  targetRevision: main
-```
+## Bootstrap the app-of-apps (after Argo CD is up)
 
 ```bash
-helm upgrade argocd . -n argocd
+kubectl apply -f ../bootstrap.yaml   # creates the infra AppProject + infra-root root app
 ```
 
-Now `infra-root` is rendered and syncs `apps/` from git → child apps `alb` (wave 0)
-and `future` (wave 1). Because the children are synced by the **parent** root app,
-their sync-wave annotations are honoured.
+`infra-root` syncs `../apps` from git → child apps `alb` (wave 0) and `future`
+(wave 1). Because the children are synced by the **parent** root app, their
+sync-wave annotations are honoured. The repo URL is set in `../bootstrap.yaml`
+(edit if you forked/renamed).
 
 ## Registering the git repo (Argo CD v3)
 
 Argo CD v3 registers repositories via **Secrets**, not `argocd-cm`.
 
-- **Public** `eks-infra` repo: nothing to do — `repo.url` is enough.
+- **Public** `eks-infra` repo: nothing to do — the repoURL in `bootstrap.yaml` is enough.
 - **Private** repo: create a Secret in the `argocd` namespace labelled
   `argocd.argoproj.io/secret-type: repository`, e.g.:
   ```yaml
@@ -72,8 +67,9 @@ Argo CD v3 registers repositories via **Secrets**, not `argocd-cm`.
 
 ## Adoption / ownership (helm install first, then GitOps)
 
-Bootstrap order is: `helm install alb` and `helm install argocd` first, then Argo
-CD **adopts** those releases via the child Applications.
+Bootstrap order is: `helm install alb` and `helm install argocd` first, then
+`kubectl apply -f ../bootstrap.yaml`, after which Argo CD **adopts** those releases
+via the child Applications.
 
 - **Clean adoption.** The `alb` child app renders the **same** chart at the same
   path, so the live (Helm-created) objects already match desired state and Argo
@@ -87,7 +83,7 @@ CD **adopts** those releases via the child Applications.
 
 ## Self-management (`apps.selfManage`) — OFF by default
 
-Set `selfManage: true` in `apps/values.yaml` to render the `argocd` child
+Set `selfManage: true` in `../apps/values.yaml` to render the `argocd` child
 Application (Argo CD managing its own release). It is deliberately conservative:
 `automated.prune: false` (never prune its own components) and `ignoreDifferences`
 on `Secret/argocd-secret` `/data` (so Argo doesn't fight the server-generated

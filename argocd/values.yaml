@@ -3,6 +3,12 @@
 # Everything nested under `argo-cd:` is passed straight through to the
 # dependency declared in Chart.yaml. Defaults not set here come from the
 # upstream chart's values.yaml.
+#
+# NOTE: this chart installs Argo CD + a host-less server Ingress ONLY. The
+# app-of-apps Argo CD resources (AppProject + root Application) are NOT here —
+# they are Argo CD CRs and Helm can't create a CR whose CRD is installed in the
+# same release. They live in ../bootstrap.yaml, applied with `kubectl apply`
+# AFTER this chart is installed. See the top-level README.
 # =============================================================================
 argo-cd:
 
@@ -76,24 +82,3 @@ argo-cd:
       requests:
         cpu: 50m
         memory: 64Mi
-
-# =============================================================================
-# app-of-apps wiring (OUR OWN values — not part of the argo-cd subchart).
-# Consumed by templates/appproject.yaml and templates/app-root.yaml.
-#
-# Bootstrap behaviour:
-#   - repo.url EMPTY (default): installing this chart creates Argo CD + the
-#     `infra` AppProject + our server Ingress only. The root app is NOT rendered.
-#   - repo.url SET to your pushed remote (then `helm upgrade`): the 'infra-root'
-#     Application is created and syncs the `apps` chart from git, which in turn
-#     creates the alb (wave 0) and future (wave 1) Applications.
-# =============================================================================
-
-# Git remote that holds THIS eks-infra repo. You MUST set this (and `helm upgrade`)
-# to activate GitOps. Argo CD reads each app's chart path from here.
-repo:
-  url: ""
-  targetRevision: main
-
-# Argo CD AppProject the root app and its children belong to.
-project: infra
