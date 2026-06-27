@@ -1,0 +1,63 @@
+# =============================================================================
+# App-of-apps BOOTSTRAP — apply this AFTER `helm install argocd` succeeds.
+#
+# These are Argo CD custom resources (AppProject + the root Application). They are
+# deliberately NOT in the argocd Helm chart: Helm cannot create a CR whose CRD is
+# installed in the SAME release, so bundling them fails a fresh install with
+# "no matches for kind AppProject ... ensure CRDs are installed first". Once the
+# argocd chart is installed (Argo CD + its CRDs are registered), apply this:
+#
+#   kubectl apply -f bootstrap.yaml
+#
+# The root Application then syncs the `apps/` chart from git, which creates the
+# child Applications (alb wave 0, future wave 1, [argocd self-manage if enabled]).
+#
+# Edit the repoURL below if you fork/rename the repository.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: infra
+  namespace: argocd
+spec:
+  description: Core infra managed by the eks-infra app-of-apps.
+  sourceRepos:
+    - https://github.com/TitusEfferian/eks-infra.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: '*'
+  # Cluster-scoped resources are needed (IngressClass, CRDs, ...); '*' for this
+  # playground project — tighten later if you want a stricter posture.
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infra-root
+  namespace: argocd
+spec:
+  project: infra
+  source:
+    repoURL: https://github.com/TitusEfferian/eks-infra.git
+    targetRevision: main
+    path: apps
+    helm:
+      # Pass the repo coordinates through to the apps chart so the child
+      # Applications know where to pull each component chart from.
+      parameters:
+        - name: repo.url
+          value: https://github.com/TitusEfferian/eks-infra.git
+        - name: repo.targetRevision
+          value: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

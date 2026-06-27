@@ -9,21 +9,25 @@ from your git remote (app-of-apps pattern with a root Application).
 
 ```
 eks-infra/
-├── alb/        # standalone AWS Load Balancer Controller (chart 3.4.0)
-│               #   owns a non-default 'alb' IngressClass; isolated from Auto Mode's LB
-├── argocd/     # Argo CD (chart 10.0.0) + AppProject + host-less server Ingress + root app
-├── apps/       # app-of-apps payload: the child Application CRs (alb, future, [argocd])
-│               #   that the 'infra-root' root Application syncs from git
-├── future/     # empty placeholder for the next core component
-└── README.md   # this runbook
+├── alb/           # standalone AWS Load Balancer Controller (chart 3.4.0)
+│                  #   owns a non-default 'alb' IngressClass; isolated from Auto Mode's LB
+├── argocd/        # Argo CD (chart 10.0.0) + host-less server Ingress (no Argo CRs here)
+├── apps/          # app-of-apps payload: child Application CRs (alb, future, [argocd])
+│                  #   that the 'infra-root' root Application syncs from git
+├── bootstrap.yaml # AppProject + root Application — kubectl apply AFTER Argo CD is up
+├── future/        # empty placeholder for the next core component
+└── README.md      # this runbook
 ```
 
-Why a separate `apps/` chart? Argo CD sync **waves are only honoured when a parent
-Application syncs the children**. If the child `Application` CRs were rendered
-straight into the argocd chart's `templates/`, Helm would apply them all at once
-and the waves would be ignored. So the argocd chart renders a single **root**
-Application (`infra-root`) that points at `apps/`, and `apps/` renders the
-children — giving real wave ordering (alb wave 0 → future wave 1).
+Why the split into `apps/` + `bootstrap.yaml`?
+- **Wave ordering** needs a parent: Argo CD honours `sync-wave` only when a parent
+  Application syncs the children. So `bootstrap.yaml`'s root Application
+  (`infra-root`) points at `apps/`, and `apps/` renders the children — giving real
+  ordering (alb wave 0 → future wave 1).
+- **CRD ordering**: Argo CD CRs (`AppProject`, `Application`) cannot live in the
+  `argocd` Helm chart — Helm can't create a CR whose CRD is installed by the *same*
+  release ("no matches for kind AppProject"). So they live in `bootstrap.yaml`,
+  applied with `kubectl apply` only **after** Argo CD (and its CRDs) is installed.
 
 Each of `alb` / `argocd` wraps an upstream chart as a vendored subchart (`helm
 dependency build` puts the `.tgz` in `charts/` — keep it in git). `apps` and
@@ -84,38 +88,36 @@ helm upgrade --install alb . -n kube-system
 kubectl -n kube-system rollout status deploy/alb-aws-load-balancer-controller
 ```
 
+On a fresh Auto Mode cluster the controller pod is `Pending` until Auto Mode
+provisions the first node (~1-2 min) — the `rollout status` blocks until it is
+`Ready`. **Wait for `Ready` before step 3** (the Argo CD Ingress is reconciled by
+this controller).
+
 ### 3. Install Argo CD into `argocd`
 
 ```bash
 cd ../argocd
 helm dependency build .                 # vendors argo-cd-10.0.0.tgz
 helm upgrade --install argocd . -n argocd --create-namespace
+kubectl -n argocd rollout status deploy/argocd-server
 ```
 
-With `repo.url` empty (the default) this installs Argo CD, the `infra`
-`AppProject`, and our host-less `argocd-server` Ingress — but **not** the root
-app yet. Argo CD is now up and reachable via the ALB.
+This installs Argo CD (controllers + CRDs) and our host-less `argocd-server`
+Ingress. **No** Argo CD `Application`/`AppProject` resources are created here —
+those are bootstrapped next, once the CRDs exist.
 
-### 4. Activate GitOps — point Argo CD at your git remote
-
-Push this `eks-infra` repo to a git remote, then set `repo.url` in
-`argocd/values.yaml` and upgrade:
-
-```yaml
-# argocd/values.yaml
-repo:
-  url: "https://github.com/<you>/eks-infra.git"
-  targetRevision: main
-```
+### 4. Bootstrap GitOps (app-of-apps) — after Argo CD is up
 
 ```bash
-helm upgrade argocd . -n argocd
+cd ..
+kubectl apply -f bootstrap.yaml          # creates the infra AppProject + infra-root root app
 ```
 
-That renders the `infra-root` root Application, which syncs `apps/` from git and
-creates the child Applications: **alb** (wave 0, adopts the release from step 2)
-then **future** (wave 1). If the repo is **private**, register it first (see
-`argocd/README.md` — Argo CD v3 uses a repository **Secret**, not `argocd-cm`).
+`infra-root` syncs `apps/` from git and creates the child Applications: **alb**
+(wave 0, adopts the release from step 2) then **future** (wave 1). The repo URL is
+set in `bootstrap.yaml` (default `https://github.com/TitusEfferian/eks-infra.git`)
+— edit it if you forked/renamed. If the repo is **private**, register it first
+(see `argocd/README.md` — Argo CD v3 uses a repository **Secret**, not `argocd-cm`).
 
 > **Single owner per chart.** Once Argo CD adopts a chart (e.g. `alb`), stop
 > running `helm upgrade` on it yourself — let Argo CD be the sole owner and make
@@ -123,10 +125,10 @@ then **future** (wave 1). If the repo is **private**, register it first (see
 
 > **Bootstrap with committed values only.** In steps 2–3, install using just the
 > chart's committed `values.yaml` — do **not** pass `--set` or extra `-f`
-> overrides. After Argo CD adopts a chart (step 4) it reconciles live resources to
-> match git with `selfHeal: true`, so any install-time override that isn't
-> committed to the chart will show as OutOfSync and be reverted on the next sync.
-> Put all configuration in `values.yaml` instead.
+> overrides. After Argo CD adopts a chart it reconciles live resources to match git
+> with `selfHeal: true`, so any install-time override that isn't committed to the
+> chart will show as OutOfSync and be reverted on the next sync. Put all
+> configuration in `values.yaml` instead.
 
 ## Access Argo CD
 
