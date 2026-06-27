@@ -14,9 +14,12 @@ class, which is left dormant.
 - Installs into `kube-system`, with `serviceAccount.name:
   aws-load-balancer-controller` and **no** IRSA annotation: IAM comes from an EKS
   **Pod Identity** association created in terraform (`aws-load-balancer-controller.tf`).
-- Renders our own `templates/ingressclass.yaml` (IngressClass `alb` +
-  cluster-scoped `IngressClassParams`); `createIngressClassResource: false` keeps
-  the subchart from creating a competing one.
+- Renders our own `templates/ingressclass.yaml` — a **bare** `IngressClass alb`
+  (no `IngressClassParams`); `createIngressClassResource: false` keeps the subchart
+  from creating a competing one. We omit `IngressClassParams` on purpose: creating
+  one during `helm install` calls the controller's validating webhook before the
+  controller pod is Ready, which is fatal on an Auto Mode cold start. ALB config
+  comes from the `alb.ingress.kubernetes.io/*` annotations on the Ingress instead.
 - Sets `enableServiceMutatorWebhook: false` so it does **not** hijack
   `type=LoadBalancer` Services (those stay with Auto Mode's NLB), and
   `defaultTargetType: ip` (required on Auto Mode).
@@ -32,6 +35,11 @@ helm upgrade --install alb . -n kube-system
 
 Prereq: run `terraform apply` in the EKS stack first so the Pod Identity role +
 association and the subnet `kubernetes.io/role/elb` tags exist.
+
+> **Auto Mode cold start.** On a cluster with no nodes, the controller pod stays
+> `Pending` until Auto Mode provisions a node (~1-2 min); the `rollout status`
+> below blocks until it is `Ready`. This is expected on the first install — wait
+> for it to be `Ready` before installing Argo CD.
 
 ## Verify
 
