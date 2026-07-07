@@ -44,7 +44,7 @@ association and the subnet `kubernetes.io/role/elb` tags exist.
 ## Verify
 
 ```bash
-kubectl -n kube-system rollout status deploy/alb-aws-load-balancer-controller
+kubectl -n kube-system rollout status deploy/alb-lbc   # release "alb" + subchart alias "lbc"
 kubectl get ingressclass alb -o yaml      # spec.controller: ingress.k8s.aws/alb
 ```
 
