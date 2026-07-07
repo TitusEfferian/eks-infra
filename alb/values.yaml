@@ -1,51 +1,19 @@
-# =============================================================================
-# Overrides for the aws-load-balancer-controller subchart (chart 3.4.0 / v3.4.0).
-# Everything nested under `lbc:` is the alias declared in Chart.yaml and is passed
-# straight through to the dependency. Defaults not set here come from the upstream
-# chart's values.yaml.
-#
-# This is the SELF-MANAGED controller (spec.controller: ingress.k8s.aws/alb),
-# intentionally NOT the EKS Auto Mode built-in eks.amazonaws.com/alb controller.
-# =============================================================================
 lbc:
-
-  # --- Required cluster identification ---------------------------------------
-  # Auto Mode does not let the controller guess these from IMDS, so set them
-  # explicitly. vpcId is the default VPC that hosts the cluster.
   clusterName: tituseff-playground
   region: ap-northeast-1
-  vpcId: vpc-0190801db617737a0
+  vpcTags:
+    Name: tituseff-playground-vpc
 
-  # --- Controller image ------------------------------------------------------
-  # Pinned to match appVersion; the chart default already points here, set
-  # explicitly for clarity / supply-chain auditing.
   image:
     repository: public.ecr.aws/eks/aws-load-balancer-controller
     tag: v3.4.0
 
-  # --- ServiceAccount (EKS Pod Identity) -------------------------------------
-  # Create the SA the controller runs as. IAM is granted via an EKS Pod Identity
-  # association (terraform: aws-load-balancer-controller.tf) bound to this exact
-  # namespace + SA name. With Pod Identity there is NO role-arn annotation here
-  # (that is the IRSA pattern, which we are deliberately NOT using).
   serviceAccount:
     create: true
     name: aws-load-balancer-controller
 
-  # --- IngressClass ownership ------------------------------------------------
-  # We own the IngressClass ourselves (templates/ingressclass.yaml) so we can
-  # control its name, default-ness and IngressClassParams. Tell the subchart NOT
-  # to create its own.
   createIngressClassResource: false
 
-  # --- Isolation from Auto Mode's NLB ----------------------------------------
-  # Do NOT install the service mutating webhook: that would let this controller
-  # hijack type=LoadBalancer Services, which on Auto Mode are handled by the
-  # built-in NLB. We only want this controller to reconcile Ingresses on the
-  # 'alb' class.
   enableServiceMutatorWebhook: false
 
-  # --- Target type -----------------------------------------------------------
-  # Register pod IPs directly instead of instance/NodePort targets. Required on
-  # EKS Auto Mode (nodes are AWS-managed and not in a traditional node group).
   defaultTargetType: ip
