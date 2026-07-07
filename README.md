@@ -85,7 +85,7 @@ terraform output -raw lbc_pod_identity_role_arn   # informational (Pod Identity 
 cd alb
 helm dependency build .                 # vendors aws-load-balancer-controller-3.4.0.tgz
 helm upgrade --install alb . -n kube-system
-kubectl -n kube-system rollout status deploy/alb-aws-load-balancer-controller
+kubectl -n kube-system rollout status deploy/alb-lbc   # release "alb" + subchart alias "lbc"
 ```
 
 On a fresh Auto Mode cluster the controller pod is `Pending` until Auto Mode
