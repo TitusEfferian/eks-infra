@@ -10,11 +10,19 @@
 lbc:
 
   # --- Required cluster identification ---------------------------------------
-  # Auto Mode does not let the controller guess these from IMDS, so set them
-  # explicitly. vpcId is the default VPC that hosts the cluster.
+  # Auto Mode blocks pod IMDS, so the controller can't auto-detect the VPC or
+  # region from instance metadata. Set clusterName + region explicitly, and
+  # resolve the VPC BY TAG: vpcTags becomes the controller's --aws-vpc-tags
+  # AND-filter (ec2:DescribeVpcs, already in the controller's IAM policy), so
+  # there is no hardcoded vpc-id to update on every VPC recreate. Do NOT also
+  # set vpcId -- the chart renders --aws-vpc-id independently and the controller
+  # prioritizes it over --aws-vpc-tags, silently pinning the wrong VPC. The
+  # AND-matched filter must resolve to exactly ONE VPC; `Name` is set by the
+  # terraform vpc module to "<cluster_name>-vpc".
   clusterName: tituseff-playground
   region: ap-northeast-1
-  vpcId: vpc-0190801db617737a0
+  vpcTags:
+    Name: tituseff-playground-vpc
 
   # --- Controller image ------------------------------------------------------
   # Pinned to match appVersion; the chart default already points here, set
