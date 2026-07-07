@@ -1,0 +1,41 @@
+# =============================================================================
+# EKS Auto Mode custom NodeClass — pins nodes to ONE subnet for static egress.
+#
+# This is the EKS Auto Mode API (apiVersion eks.amazonaws.com/v1), NOT the
+# upstream Karpenter EC2NodeClass (karpenter.k8s.aws). Auto Mode's built-in
+# NodePools use AWS-managed NodeClasses you can't edit; to control the subnet you
+# supply your OWN NodeClass + NodePool.
+#
+# CRITICAL: subnetSelectorTerms MUST resolve to EXACTLY ONE subnet. A node lands
+# in that subnet, and (with the default SNAT policy, Random) its pods' outbound
+# traffic follows that subnet's route table -> NAT gateway -> Elastic IP. That is
+# the whole mechanism behind per-client static egress.
+#
+# snatPolicy is intentionally LEFT UNSET so it uses the default (Random), which
+# SNATs pod egress to the node's ENI. Do NOT set it to Disabled — that would stop
+# pod traffic from taking the node's subnet/NAT path and break the test.
+# =============================================================================
+apiVersion: eks.amazonaws.com/v1
+kind: NodeClass
+metadata:
+  name: {{ .Values.client }}
+  labels:
+    app.kubernetes.io/part-of: egress-test
+    client: {{ .Values.client }}
+spec:
+  # Role NAME (not ARN). Reuse the existing Auto Mode node role (see values.yaml).
+  role: {{ .Values.nodeRole }}
+
+  # EXACTLY ONE subnet. `id` wins when set; otherwise select by a unique tag.
+  subnetSelectorTerms:
+    {{- if .Values.subnet.id }}
+    - id: {{ .Values.subnet.id | quote }}
+    {{- else }}
+    - tags:
+        {{ .Values.subnet.tagKey }}: {{ .Values.subnet.tagValue | default .Values.client | quote }}
+    {{- end }}
+
+  # Cluster security group(s), by tag. Multiple matches are OK for SGs.
+  securityGroupSelectorTerms:
+    - tags:
+        {{ .Values.securityGroup.tagKey }}: {{ .Values.securityGroup.tagValue | quote }}

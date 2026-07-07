@@ -12,10 +12,12 @@ eks-infra/
 ├── alb/           # standalone AWS Load Balancer Controller (chart 3.4.0)
 │                  #   owns a non-default 'alb' IngressClass; isolated from Auto Mode's LB
 ├── argocd/        # Argo CD (chart 10.0.0) + host-less server Ingress (no Argo CRs here)
-├── apps/          # app-of-apps payload: child Application CRs (alb, future, [argocd])
-│                  #   that the 'infra-root' root Application syncs from git
+├── apps/          # app-of-apps payload: child Application CRs (alb, future,
+│                  #   [egress-test], [argocd]) synced by the 'infra-root' root app
 ├── bootstrap.yaml # AppProject + root Application — kubectl apply AFTER Argo CD is up
 ├── future/        # empty placeholder for the next core component
+├── egress-test/   # opt-in: per-client static-egress verification (netshoot pinned
+│                  #   to one subnet); confirms a client's outbound NAT Elastic IP
 └── README.md      # this runbook
 ```
 

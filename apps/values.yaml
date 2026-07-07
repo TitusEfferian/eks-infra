@@ -20,3 +20,9 @@ project: infra
 # release that bootstrapped it). Advanced / opt-in — see apps/templates/app-argocd.yaml
 # and argocd/README.md. Toggle this in git, then let the root app sync it.
 selfManage: false
+
+# Egress verification: render the `egress-test` child Application (netshoot pinned
+# to one subnet to confirm a client's static NAT egress IP). Opt-in — it is a
+# deliberate TEST that provisions a real Auto Mode node. See egress-test/README.md.
+# Toggle this in git, then let the root app sync it.
+egressTest: false

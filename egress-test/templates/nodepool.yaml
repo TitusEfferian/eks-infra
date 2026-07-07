@@ -1,0 +1,56 @@
+# =============================================================================
+# NodePool for the pinned client. Auto Mode uses the karpenter.sh/v1 NodePool API
+# but points nodeClassRef at the EKS Auto Mode NodeClass group (eks.amazonaws.com).
+#
+# The node gets label   client=<name>   and taint   client=<name>:NoSchedule.
+#   - The taint keeps OTHER workloads OFF these nodes (only pods that tolerate it).
+#   - The label lets the test pod target these nodes via nodeSelector.
+# The built-in `general-purpose` NodePool is UNTAINTED, so the pod's nodeSelector
+# (client=<name>) is what keeps it off general-purpose nodes; the taint keeps
+# unrelated pods off ours. Both halves matter.
+# =============================================================================
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: {{ .Values.client }}
+  labels:
+    app.kubernetes.io/part-of: egress-test
+    client: {{ .Values.client }}
+spec:
+  template:
+    metadata:
+      labels:
+        client: {{ .Values.client }}
+    spec:
+      nodeClassRef:
+        group: eks.amazonaws.com
+        kind: NodeClass
+        name: {{ .Values.client }}
+      taints:
+        - key: client
+          value: {{ .Values.client }}
+          effect: NoSchedule
+      # Broad hardware constraints — egress pinning is by subnet, not instance.
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values:
+            {{- range .Values.nodePool.architectures }}
+            - {{ . | quote }}
+            {{- end }}
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            {{- range .Values.nodePool.capacityTypes }}
+            - {{ . | quote }}
+            {{- end }}
+        - key: eks.amazonaws.com/instance-category
+          operator: In
+          values:
+            {{- range .Values.nodePool.instanceCategories }}
+            - {{ . | quote }}
+            {{- end }}
+        - key: eks.amazonaws.com/instance-generation
+          operator: Gt
+          values:
+            - {{ .Values.nodePool.minInstanceGeneration | quote }}

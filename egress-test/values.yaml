@@ -1,0 +1,81 @@
+# =============================================================================
+# Values for the `egress-test` chart — a per-client static-egress verification
+# workload (netshoot pinned to ONE subnet via a custom Auto Mode NodeClass +
+# NodePool). Change `client` + subnet selection per client under test.
+#
+# HOW EGRESS PINNING WORKS: pods scheduled onto this NodePool's nodes run in the
+# selected subnet; with the NodeClass's default SNAT policy (Random) their
+# outbound traffic SNATs to the node ENI and follows that subnet's route table
+# (0.0.0.0/0 -> the subnet's NAT gateway -> that NAT's Elastic IP). So the public
+# IP seen by `curl ifconfig.me` is the client's dedicated NAT EIP.
+# =============================================================================
+
+# Logical client name. Drives the NodeClass/NodePool names, the node label
+# (client=<name>) + taint (client=<name>:NoSchedule), and the pod's nodeSelector
+# + toleration. Keep it DNS-1123 safe (lowercase alphanumerics and '-').
+client: sample-client
+
+# Namespace the netshoot Deployment runs in. A Namespace object is rendered so
+# `helm template ... | kubectl apply -f -` is self-contained (Argo CD also sets
+# CreateNamespace=true on the child Application).
+namespace: egress-test
+
+# --- netshoot image ----------------------------------------------------------
+# nicolaka/netshoot is multi-arch (amd64/arm64). v0.16 is the current release
+# (2026-07-01). Pin an explicit tag — never :latest — for reproducibility.
+image:
+  repository: nicolaka/netshoot
+  tag: v0.16
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+# Minimal footprint — this is a throwaway debug pod. No CPU limit (avoid throttle).
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+# =============================================================================
+# Auto Mode node pinning
+# =============================================================================
+
+# IAM role NAME (NOT the ARN) the provisioned nodes assume. REUSE the existing
+# EKS Auto Mode node role: its EKS access entry (type EC2 + AmazonEKSAutoNodePolicy)
+# already exists, so custom-NodeClass nodes join without any new access entry.
+#
+# Discover it from the EKS Terraform stack (my_terraform_collections/EKS):
+#   terraform output -raw node_iam_role_arn   # -> arn:aws:iam::<acct>:role/<NAME>
+# then use the part after 'role/'. This is a PLACEHOLDER — set the real role name
+# before enabling this chart; it changes every time the cluster is rebuilt.
+nodeRole: REPLACE_ME-auto-mode-node-role-name
+
+# Subnet the NodeClass pins nodes to. It MUST resolve to EXACTLY ONE subnet.
+#   - Production per-client path: leave `id` empty and select the dedicated
+#     private subnet by a UNIQUE tag (created by Terraform in a separate repo),
+#     e.g. egress-client=<client>.
+#   - Quick pinning-mechanics test (no dedicated subnet yet): set `id` to an
+#     existing private subnet id; egress then exits via the SHARED NAT EIP.
+# When `id` is non-empty it wins and the tag is ignored.
+subnet:
+  id: ""                    # e.g. subnet-03990bea04e55b757 (an existing private subnet)
+  tagKey: egress-client     # used only when id is empty
+  tagValue: sample-client   # defaults to <client>; override if the tag differs
+
+# Security group(s) attached to the nodes, selected by tag. The EKS cluster tags
+# its node/primary security group(s) with kubernetes.io/cluster/<name>: owned.
+# Unlike subnets, matching MORE THAN ONE security group is allowed (all attach).
+securityGroup:
+  tagKey: kubernetes.io/cluster/tituseff-playground
+  tagValue: owned
+
+# NodePool scheduling constraints. Broad on purpose so Auto Mode has room to pick
+# an instance; egress pinning comes from the subnet, not the instance type.
+nodePool:
+  architectures: ["amd64"]
+  capacityTypes: ["on-demand"]
+  instanceCategories: ["c", "m", "r"]
+  # Only instance generations strictly greater than this (newer, cheaper/faster).
+  minInstanceGeneration: "4"
