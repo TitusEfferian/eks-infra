@@ -33,8 +33,4 @@ selfManage: false
 # test can't pass until the subnet is there).
 egressTest: true
 
-# Second egress client (destination-b): renders a SECOND egress-test release with
-# parameter overrides (client / namespace / subnet tag), into its own namespace.
-# Default false — enable only AFTER destination-b's Terraform (subnet/NAT/EIP) is
-# applied (which needs the EIP quota raised). Same ordering caveat as egressTest.
 egressTestDestinationB: false
