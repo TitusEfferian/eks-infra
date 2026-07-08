@@ -39,3 +39,10 @@ spec:
   securityGroupSelectorTerms:
     - tags:
         {{ .Values.securityGroup.tagKey }}: {{ .Values.securityGroup.tagValue | quote }}
+  {{- with .Values.advancedNetworking }}
+  {{- if .ipv4PrefixSize }}
+  # Only rendered when set — forces secondary-IP mode for small/fragmented subnets.
+  advancedNetworking:
+    ipv4PrefixSize: {{ .ipv4PrefixSize | quote }}
+  {{- end }}
+  {{- end }}

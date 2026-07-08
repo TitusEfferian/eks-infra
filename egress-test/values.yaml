@@ -13,7 +13,7 @@
 # Logical client name. Drives the NodeClass/NodePool names, the node label
 # (client=<name>) + taint (client=<name>:NoSchedule), and the pod's nodeSelector
 # + toleration. Keep it DNS-1123 safe (lowercase alphanumerics and '-').
-client: sample-client
+client: destination-a
 
 # Namespace the netshoot Deployment runs in. A Namespace object is rendered so
 # `helm template ... | kubectl apply -f -` is self-contained (Argo CD also sets
@@ -47,10 +47,10 @@ resources:
 # already exists, so custom-NodeClass nodes join without any new access entry.
 #
 # Discover it from the EKS Terraform stack (my_terraform_collections/EKS):
-#   terraform output -raw node_iam_role_arn   # -> arn:aws:iam::<acct>:role/<NAME>
-# then use the part after 'role/'. This is a PLACEHOLDER — set the real role name
-# before enabling this chart; it changes every time the cluster is rebuilt.
-nodeRole: REPLACE_ME-auto-mode-node-role-name
+#   terraform output -raw node_iam_role_name  # (added to the EKS stack root outputs)
+# NOTE: this value is specific to the CURRENT cluster and changes every time the
+# cluster is rebuilt — re-read the Terraform output and update it after any rebuild.
+nodeRole: tituseff-playground-eks-auto-a5682598a6da0e4251a31d0755
 
 # Subnet the NodeClass pins nodes to. It MUST resolve to EXACTLY ONE subnet.
 #   - Production per-client path: leave `id` empty and select the dedicated
@@ -60,9 +60,9 @@ nodeRole: REPLACE_ME-auto-mode-node-role-name
 #     existing private subnet id; egress then exits via the SHARED NAT EIP.
 # When `id` is non-empty it wins and the tag is ignored.
 subnet:
-  id: ""                    # e.g. subnet-03990bea04e55b757 (an existing private subnet)
-  tagKey: egress-client     # used only when id is empty
-  tagValue: sample-client   # defaults to <client>; override if the tag differs
+  id: ""                    # empty = select by tag below (the production per-client path)
+  tagKey: egress-client     # matches the tag Terraform puts on the dedicated subnet
+  tagValue: destination-a          # -> egress-client=destination-a (must exist: apply the EKS Terraform first)
 
 # Security group(s) attached to the nodes, selected by tag. The EKS cluster tags
 # its node/primary security group(s) with kubernetes.io/cluster/<name>: owned.
@@ -79,3 +79,18 @@ nodePool:
   instanceCategories: ["c", "m", "r"]
   # Only instance generations strictly greater than this (newer, cheaper/faster).
   minInstanceGeneration: "4"
+  # Availability zones the nodes may launch in. For a SINGLE static egress IP this
+  # must be the one AZ of the client's dedicated subnet (a subnet + NAT gateway are
+  # AZ-scoped). The subnet selection already implies the AZ, so this is a belt-and-
+  # suspenders pin; rendered as a topology.kubernetes.io/zone requirement when set.
+  # Leave [] to omit it (rely on subnet selection alone).
+  zones: ["ap-northeast-1a"]
+
+# --- Optional: Auto Mode pod-networking tuning --------------------------------
+# Auto Mode's managed VPC CNI defaults to PREFIX mode (/28 prefixes per node). On a
+# SMALL or fragmented dedicated subnet (/27–/26) that can fail with
+# InsufficientCidrBlocks. Setting ipv4PrefixSize: "32" forces secondary-IP mode
+# (one warm IP per node). Leave empty for a /24+ subnet (our default). This field
+# is UNVERIFIED on this cluster — enable only after confirming it applies cleanly.
+advancedNetworking:
+  ipv4PrefixSize: ""   # "" = Auto Mode default (prefix mode); e.g. "32" for tiny subnets

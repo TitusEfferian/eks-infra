@@ -1,13 +1,14 @@
 # =============================================================================
 # netshoot Deployment — the actual egress probe. Pinned onto this client's nodes
 # with BOTH a nodeSelector (client=<name>) AND a matching toleration for the
-# NodePool's taint. Kept alive with `sleep infinity` (a bare netshoot pod's shell
-# would exit and CrashLoopBackOff).
+# NodePool's taint. Kept alive with `tail -f /dev/null` (a bare netshoot pod's
+# shell would exit and CrashLoopBackOff; `sleep infinity` is avoided because
+# netshoot is Alpine/busybox and its `sleep` may reject the `infinity` argument).
 #
-# Test:  kubectl -n <ns> exec deploy/netshoot -- curl -s ifconfig.me
+# Test:  kubectl -n <ns> exec deploy/netshoot -- curl -s https://checkip.amazonaws.com
 #        -> should print the client's dedicated NAT Elastic IP.
-# No special capabilities are needed for outbound curl, so it runs non-root with
-# all Linux capabilities dropped.
+# No special capabilities are needed for outbound curl, so it runs non-root, with a
+# read-only root filesystem, all Linux capabilities dropped, and a writable /tmp.
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -41,24 +42,35 @@ spec:
           effect: NoSchedule
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        fsGroup: 65532
+        runAsUser: 65534   # nobody (exists in the netshoot Alpine base)
+        runAsGroup: 65534
+        fsGroup: 65534     # so the non-root user can write the /tmp emptyDir
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: netshoot
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          # Keep the pod running so we can exec in; a bare shell would exit.
-          command: ["sleep", "infinity"]
+          # Keep the pod running so we can exec in. `tail -f /dev/null` (NOT
+          # `sleep infinity`) — busybox `sleep` may reject the `infinity` arg.
+          command: ["tail", "-f", "/dev/null"]
+          env:
+            # Writable HOME for shells/tools, since the root fs is read-only.
+            - name: HOME
+              value: /tmp
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
-      # sleep handles SIGTERM promptly; no need for a long grace period.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      # tail handles SIGTERM promptly; no need for a long grace period.
       terminationGracePeriodSeconds: 5

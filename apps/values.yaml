@@ -22,7 +22,13 @@ project: infra
 selfManage: false
 
 # Egress verification: render the `egress-test` child Application (netshoot pinned
-# to one subnet to confirm a client's static NAT egress IP). Opt-in — it is a
-# deliberate TEST that provisions a real Auto Mode node. See egress-test/README.md.
-# Toggle this in git, then let the root app sync it.
-egressTest: false
+# to one subnet to confirm a client's static NAT egress IP). It is a deliberate
+# TEST that provisions a real Auto Mode node. See egress-test/README.md.
+#
+# ORDERING (important): the chart's NodeClass selects the dedicated subnet by the
+# tag egress-client=<client>. That subnet + its NAT + Elastic IP are created by the
+# EKS Terraform stack (my_terraform_collections/EKS, module.client_egress). APPLY
+# THAT TERRAFORM FIRST. If this is enabled before the subnet exists, the NodeClass
+# matches zero subnets and the netshoot pod simply stays Pending (harmless, but the
+# test can't pass until the subnet is there).
+egressTest: true
