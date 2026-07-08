@@ -1,0 +1,40 @@
+{{- if .Values.egressTest }}
+# =============================================================================
+# egress-test — per-client static-egress VERIFICATION workload (netshoot pinned
+# to one subnet). GATED behind .Values.egressTest (default false) because it is a
+# deliberate, on-demand TEST that provisions a real Auto Mode node (and, in the
+# production path, relies on a dedicated per-client subnet + NAT). Enable it only
+# when you actively want to run the check:
+#   - flip egressTest: true in apps/values.yaml (GitOps), or
+#   - render the chart directly and kubectl apply it (see egress-test/README.md).
+# Sync wave 2: after alb (0) and future (1).
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: egress-test
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project }}
+  source:
+    repoURL: {{ .Values.repo.url | quote }}
+    targetRevision: {{ .Values.repo.targetRevision }}
+    path: egress-test
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: egress-test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+{{- end }}

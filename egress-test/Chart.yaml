@@ -1,0 +1,13 @@
+apiVersion: v2
+name: egress-test
+description: Per-client static-egress VERIFICATION workload. Pins a netshoot pod to a single dedicated subnet (via a custom EKS Auto Mode NodeClass + NodePool) so you can exec in and confirm its outbound public IP equals that client's dedicated NAT Elastic IP. Raw manifests only — no upstream subchart.
+type: application
+
+# Version of THIS chart (bump on any change here).
+version: 0.1.0
+
+# Mirrors the pinned nicolaka/netshoot image shipped in values.yaml.
+appVersion: "v0.16"
+
+# No dependencies: this chart renders plain Kubernetes/EKS objects (Namespace,
+# NodeClass, NodePool, Deployment) from templates/ — same style as `future`.

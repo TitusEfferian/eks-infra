@@ -17,6 +17,7 @@ ignored.
 | --- | --- | --- | --- | --- | --- |
 | `alb` | `alb` | `kube-system` | 0 | yes | always |
 | `future` | `future` | `future` | 1 | yes | always (no-op until the chart is populated) |
+| `egress-test` | `egress-test` | `egress-test` | 2 | yes | `egressTest: true` only |
 | `argocd` | `argocd` | `argocd` | -1 | **no** | `selfManage: true` only |
 
 ## Values
@@ -27,6 +28,9 @@ ignored.
   `project` (default `infra`).
 - `selfManage` — render the `argocd` self-management app (advanced/opt-in). See
   `../argocd/README.md`.
+- `egressTest` — render the `egress-test` netshoot verification app (opt-in; a
+  deliberate test that provisions a real Auto Mode node). See
+  `../egress-test/README.md`.
 
 ## Render locally
 
@@ -34,4 +38,5 @@ ignored.
 helm template apps . -n argocd \
   --set repo.url=https://github.com/<you>/eks-infra.git
 # add --set selfManage=true to also render the argocd self-management app
+# add --set egressTest=true to also render the egress-test verification app
 ```

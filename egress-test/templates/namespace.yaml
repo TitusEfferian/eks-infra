@@ -1,0 +1,11 @@
+# =============================================================================
+# Namespace for the netshoot test pod. Rendered so a direct
+# `helm template egress-test . | kubectl apply -f -` is self-contained; Argo CD
+# also has CreateNamespace=true on the child Application, so either path works.
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: egress-test
