@@ -32,3 +32,5 @@ selfManage: false
 # matches zero subnets and the netshoot pod simply stays Pending (harmless, but the
 # test can't pass until the subnet is there).
 egressTest: true
+
+egressTestDestinationB: false
