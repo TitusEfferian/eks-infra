@@ -1,0 +1,53 @@
+{{- if .Values.egressTestDestinationB }}
+# =============================================================================
+# egress-test (destination-b) — a SECOND dedicated-egress verification workload.
+# Reuses the same `egress-test` chart as destination-a, overriding client /
+# namespace / subnet tag via Helm parameters, and renders into its OWN namespace
+# so nothing collides with the destination-a release. Purely additive.
+#
+# nodeRole is intentionally NOT overridden here — it is inherited from
+# egress-test/values.yaml so the Auto Mode node role lives in exactly one place.
+#
+# GATED behind .Values.egressTestDestinationB (default false). Prereqs before
+# enabling: (1) destination-b's subnet/NAT/EIP exist (EKS Terraform
+# module.client_egress — needs the EIP quota raised), and (2) the node role in
+# egress-test/values.yaml is current for this cluster.
+# Sync wave 2: after alb (0) and future (1).
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: egress-test-destination-b
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: {{ .Values.project }}
+  source:
+    repoURL: {{ .Values.repo.url | quote }}
+    targetRevision: {{ .Values.repo.targetRevision }}
+    path: egress-test
+    helm:
+      valueFiles:
+        - values.yaml
+      # Override only what differs from the destination-a values.yaml.
+      parameters:
+        - name: client
+          value: destination-b
+        - name: namespace
+          value: egress-test-destination-b
+        - name: subnet.tagValue
+          value: destination-b
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: egress-test-destination-b
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+{{- end }}
