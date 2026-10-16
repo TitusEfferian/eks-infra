@@ -33,10 +33,6 @@ argo-cd:
       # backend without TLS. Required for this no-ACM ALB setup.
       server.insecure: true
     cm:
-      # Enable the UI web terminal (TERMINAL tab on pods). Built-in role:admin
-      # already grants `exec, create, */*`, so no policy.csv change is needed;
-      # the chart adds the `pods/exec` create rule to the argocd-server
-      # ClusterRole automatically when this is true.
       exec.enabled: true
 
   # --- Lean / NON-HA topology ------------------------------------------------
