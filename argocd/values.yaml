@@ -26,7 +26,6 @@ argo-cd:
     install: true
     keep: true
 
-  # --- argocd-cmd-params-cm / argocd-cm (free-form maps) ---------------------
   configs:
     params:
       # Serve the API/UI over plain HTTP so the HTTP:80 ALB can reach the
