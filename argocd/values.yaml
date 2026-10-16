@@ -26,12 +26,13 @@ argo-cd:
     install: true
     keep: true
 
-  # --- argocd-cmd-params-cm (free-form map) ----------------------------------
   configs:
     params:
       # Serve the API/UI over plain HTTP so the HTTP:80 ALB can reach the
       # backend without TLS. Required for this no-ACM ALB setup.
       server.insecure: true
+    cm:
+      exec.enabled: true
 
   # --- Lean / NON-HA topology ------------------------------------------------
   # Disable Dex (SSO) — initial access is the built-in admin user only.

@@ -17,6 +17,13 @@ host-less server Ingress only** — the app-of-apps Argo CD resources live in
   create a CR whose CRD is installed by the *same* release ("no matches for kind
   AppProject … ensure CRDs are installed first"). They live in `../bootstrap.yaml`,
   applied with `kubectl apply` **after** this chart is installed.
+- **Web terminal is enabled** (`argo-cd.configs.cm."exec.enabled": true`): the UI
+  shows a **TERMINAL** tab on pods. The built-in `role:admin` already has
+  `exec, create, */*`, and the chart adds `pods/exec` `create` to the
+  `argocd-server` ClusterRole (and Role). The server Deployment carries a
+  `checksum/cm` annotation, so `helm upgrade` rolls `argocd-server` (plus
+  repo-server and application-controller) automatically on an `argocd-cm` change;
+  no manual restart needed (hard-refresh the browser afterwards).
 
 ## Install
 
