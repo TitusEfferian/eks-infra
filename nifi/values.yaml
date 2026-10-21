@@ -30,9 +30,9 @@ storage:
   size: 100Gi
 
 ingress:
-  enabled: false
+  enabled: true
 
-  certificateArn: ""
+  certificateArn: arn:aws:acm:ap-northeast-1:588497192517:certificate/c5562b20-3b6e-4374-970f-6950ad1dc290
 
   loadBalancerName: tituseff-playground-nifi
 
