@@ -1,0 +1,60 @@
+{{- if .Values.ingress.enabled }}
+# =============================================================================
+# Internet-facing ALB for NiFi, on the self-managed 'alb' IngressClass (created
+# by the alb chart). GATED behind .Values.ingress.enabled (default false).
+#
+# TLS: the browser terminates on the ALB with the ACM cert for `host`; the ALB
+# then RE-ENCRYPTS to NiFi on :8443 (backend-protocol HTTPS) — NiFi 2.x only
+# serves HTTPS. The ALB does NOT validate target certificates, so NiFi's
+# self-signed cert (and its eventual expiry) does not break this hop.
+#
+# Rendering FAILS via `required` if certificateArn is empty: an HTTPS listener
+# without a cert would only fail later, inside the controller, far less visibly.
+#
+# DNS: there is no ExternalDNS in the cluster — after the ALB exists, create a
+# Route53 alias A record `host` -> the ALB DNS name by hand (see README).
+# =============================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nifi
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: nifi
+    app.kubernetes.io/part-of: nifi
+  annotations:
+    # Internet-facing (public) ALB.
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # Register pod IPs directly (recommended on EKS Auto Mode).
+    alb.ingress.kubernetes.io/target-type: ip
+    # HTTP:80 exists only to redirect to HTTPS:443.
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: {{ required "ingress.certificateArn is required when ingress.enabled=true (ACM cert for the NiFi host in ap-northeast-1)" .Values.ingress.certificateArn | quote }}
+    alb.ingress.kubernetes.io/ssl-policy: {{ .Values.ingress.sslPolicy | quote }}
+    # ALB -> NiFi over HTTPS (NiFi's self-signed cert; not validated by the ALB).
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
+    # Target health check against an unauthenticated NiFi API endpoint.
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/healthcheck-path: /nifi-api/authentication/configuration
+    # ALB health checks send Host=<target IP>, which is not a SAN on NiFi's
+    # self-signed cert, so NiFi answers 400. A 400 from Jetty still proves NiFi is
+    # up and serving, so 400 counts as healthy. (ALB does not validate target certs.)
+    alb.ingress.kubernetes.io/success-codes: "200,400"
+    # Who may reach the ALB. 0.0.0.0/0 by default — narrow it (e.g. your IP/32).
+    alb.ingress.kubernetes.io/inbound-cidrs: {{ .Values.ingress.inboundCidrs | quote }}
+spec:
+  ingressClassName: alb
+  rules:
+    - host: {{ .Values.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nifi
+                port:
+                  number: 8443
+{{- end }}
