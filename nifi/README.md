@@ -89,6 +89,11 @@ so once this is on the tracked branch the `infra-root` app renders the `nifi`
 child Application (sync wave 2, after the ALB controller) and Argo CD syncs this
 chart.
 
+The `nifi` Application sets `argocd.argoproj.io/compare-options: ServerSideDiff=true`
+to avoid a permanent StatefulSet OutOfSync on `volumeClaimTemplates` (API-server
+defaults flagged as drift); see
+[Argo CD diff strategies](https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/).
+
 First boot takes a few minutes (keystore generation, NAR unpacking); the
 startupProbe allows up to 10 minutes.
 

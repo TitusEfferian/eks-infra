@@ -152,7 +152,9 @@ spec:
               mountPath: /opt/nifi/nifi-current/logs
               subPath: logs
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: data
         labels:
           app.kubernetes.io/name: nifi
@@ -160,6 +162,7 @@ spec:
       spec:
         accessModes:
           - ReadWriteOnce
+        volumeMode: Filesystem
         storageClassName: {{ .Values.storage.storageClass.name }}
         resources:
           requests:
