@@ -18,7 +18,7 @@ eks-infra/
 ├── future/        # empty placeholder for the next core component
 ├── egress-test/   # opt-in: per-client static-egress verification (netshoot pinned
 │                  #   to one subnet); confirms a client's outbound NAT Elastic IP
-├── nifi/          # opt-in: Apache NiFi 2.7.2 standalone (raw manifests) — one
+├── nifi/          # on by default: Apache NiFi 2.7.2 standalone (raw manifests) — one
 │                  #   StatefulSet pod, encrypted gp3 EBS, optional HTTPS ALB
 └── README.md      # this runbook
 ```

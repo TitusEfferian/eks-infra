@@ -90,9 +90,10 @@ Edit `values.yaml` (every key is documented inline). The ones you'll usually set
 
 ## Install
 
-GitOps (the normal path): set `nifi: true` in `../apps/values.yaml`, commit and
-push; the `infra-root` app renders the `nifi` child Application (sync wave 2,
-after the ALB controller) and Argo CD syncs this chart.
+GitOps (the normal path): `nifi: true` is the default in `../apps/values.yaml`,
+so once this is on the tracked branch the `infra-root` app renders the `nifi`
+child Application (sync wave 2, after the ALB controller) and Argo CD syncs this
+chart.
 
 First boot takes a few minutes (keystore generation, NAR unpacking); the
 startupProbe allows up to 10 minutes.

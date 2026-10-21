@@ -35,4 +35,4 @@ egressTest: true
 
 egressTestDestinationB: false
 
-nifi: false
+nifi: true

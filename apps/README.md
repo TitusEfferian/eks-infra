@@ -18,7 +18,7 @@ ignored.
 | `alb` | `alb` | `kube-system` | 0 | yes | always |
 | `future` | `future` | `future` | 1 | yes | always (no-op until the chart is populated) |
 | `egress-test` | `egress-test` | `egress-test` | 2 | yes | `egressTest: true` only |
-| `nifi` | `nifi` | `nifi` | 2 | yes | `nifi: true` only |
+| `nifi` | `nifi` | `nifi` | 2 | yes | `nifi: true` (default) |
 | `argocd` | `argocd` | `argocd` | -1 | **no** | `selfManage: true` only |
 
 ## Values
@@ -32,7 +32,7 @@ ignored.
 - `egressTest` — render the `egress-test` netshoot verification app (opt-in; a
   deliberate test that provisions a real Auto Mode node). See
   `../egress-test/README.md`.
-- `nifi` — render the `nifi` Apache NiFi 2.7.2 standalone app (opt-in; provisions
+- `nifi` — render the `nifi` Apache NiFi 2.7.2 standalone app (enabled by default; provisions
   a retained EBS volume and, with its Ingress enabled, a public ALB). See
   `../nifi/README.md`.
 
@@ -43,5 +43,5 @@ helm template apps . -n argocd \
   --set repo.url=https://github.com/<you>/eks-infra.git
 # add --set selfManage=true to also render the argocd self-management app
 # add --set egressTest=true to also render the egress-test verification app
-# add --set nifi=true to also render the nifi app
+# add --set nifi=false to omit the nifi app (rendered by default)
 ```
