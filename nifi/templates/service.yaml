@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nifi-headless
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: nifi
+    app.kubernetes.io/part-of: nifi
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: nifi
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nifi
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: nifi
+    app.kubernetes.io/part-of: nifi
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nifi
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+      protocol: TCP

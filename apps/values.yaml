@@ -34,3 +34,5 @@ selfManage: false
 egressTest: true
 
 egressTestDestinationB: false
+
+nifi: true

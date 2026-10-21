@@ -13,11 +13,13 @@ eks-infra/
 │                  #   owns a non-default 'alb' IngressClass; isolated from Auto Mode's LB
 ├── argocd/        # Argo CD (chart 10.0.0) + host-less server Ingress (no Argo CRs here)
 ├── apps/          # app-of-apps payload: child Application CRs (alb, future,
-│                  #   [egress-test], [argocd]) synced by the 'infra-root' root app
+│                  #   [egress-test], [nifi], [argocd]) synced by the 'infra-root' root app
 ├── bootstrap.yaml # AppProject + root Application — kubectl apply AFTER Argo CD is up
 ├── future/        # empty placeholder for the next core component
 ├── egress-test/   # opt-in: per-client static-egress verification (netshoot pinned
 │                  #   to one subnet); confirms a client's outbound NAT Elastic IP
+├── nifi/          # on by default: Apache NiFi 2.7.2 standalone (raw manifests) — one
+│                  #   StatefulSet pod, encrypted gp3 EBS, optional HTTPS ALB
 └── README.md      # this runbook
 ```
 
@@ -33,7 +35,8 @@ Why the split into `apps/` + `bootstrap.yaml`?
 
 Each of `alb` / `argocd` wraps an upstream chart as a vendored subchart (`helm
 dependency build` puts the `.tgz` in `charts/` — keep it in git). `apps` and
-`future` have no dependencies.
+`future` have no dependencies; nor do the raw-manifest charts `egress-test` and
+`nifi`.
 
 ## Pinned versions
 
@@ -41,6 +44,7 @@ dependency build` puts the `.tgz` in `charts/` — keep it in git). `apps` and
 | --- | --- | --- |
 | Argo CD | `argo/argo-cd` 10.0.0 | v3.4.4 |
 | AWS Load Balancer Controller | `eks/aws-load-balancer-controller` 3.4.0 | `public.ecr.aws/eks/aws-load-balancer-controller:v3.4.0` |
+| Apache NiFi (standalone) | local `nifi` 0.1.0 (raw manifests) | `apache/nifi:2.7.2` |
 | Pod Identity IAM module (EKS stack) | `terraform-aws-modules/eks-pod-identity/aws` | `~> 2.8` |
 | EKS module (EKS stack) | `terraform-aws-modules/eks/aws` | 21.24.0 |
 
