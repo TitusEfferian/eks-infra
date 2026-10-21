@@ -1,15 +1,3 @@
-# =============================================================================
-# Two Services for the single NiFi pod:
-#
-# - nifi-headless (clusterIP: None): the StatefulSet's governing Service
-#   (spec.serviceName). Gives the pod its stable DNS identity
-#   nifi-0.nifi-headless.<ns>.svc. Required by StatefulSet semantics even for a
-#   single replica.
-# - nifi (ClusterIP): the stable front door used by the ALB Ingress backend and by
-#   `kubectl -n nifi port-forward svc/nifi 8443:8443`.
-#
-# Both speak HTTPS on 8443 — NiFi 2.x serves only HTTPS (self-signed cert).
-# =============================================================================
 apiVersion: v1
 kind: Service
 metadata:

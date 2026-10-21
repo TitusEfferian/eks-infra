@@ -1,13 +1,4 @@
 {{- if .Values.nifi }}
-# =============================================================================
-# nifi — Apache NiFi 2.7.2 STANDALONE (one StatefulSet pod, encrypted gp3 EBS,
-# optional internet-facing ALB). GATED behind .Values.nifi (default false)
-# because it provisions a real 100Gi EBS volume (reclaimPolicy Retain — it
-# outlives the app) and, once the Ingress is enabled, a public ALB. Before
-# enabling, change the placeholder credentials in nifi/values.yaml and read
-# nifi/README.md (ACM cert + Route53 alias prerequisites for the Ingress).
-# Sync wave 2: after alb (0) and future (1) — the Ingress needs the LBC.
-# =============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

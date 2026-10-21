@@ -35,12 +35,4 @@ egressTest: true
 
 egressTestDestinationB: false
 
-# Apache NiFi 2.7.2 standalone: render the `nifi` child Application (one
-# StatefulSet pod on an encrypted gp3 EBS volume, optional internet-facing ALB).
-# Opt-in because it provisions a real 100Gi EBS volume (reclaimPolicy Retain — it
-# outlives the app) and, with its Ingress enabled, a public ALB.
-#
-# BEFORE ENABLING: change the placeholder credentials in nifi/values.yaml (they
-# are plaintext in git — playground only). For the ALB, also issue an ACM cert +
-# create the Route53 alias record. See nifi/README.md.
 nifi: false

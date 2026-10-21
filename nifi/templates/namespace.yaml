@@ -1,13 +1,3 @@
-# =============================================================================
-# Namespace for NiFi. Rendered so a direct `helm template nifi . | kubectl apply
-# -f -` is self-contained; Argo CD also has CreateNamespace=true on the child
-# Application, so either path works.
-#
-# Pod Security Admission is set to `restricted` (enforce + warn + audit): the
-# NiFi pod is fully compliant (non-root uid 1000, no privilege escalation, all
-# capabilities dropped, RuntimeDefault seccomp), so anything less hardened that
-# lands here is rejected rather than silently admitted.
-# =============================================================================
 apiVersion: v1
 kind: Namespace
 metadata:

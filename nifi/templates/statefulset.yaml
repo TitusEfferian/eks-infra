@@ -1,31 +1,3 @@
-# =============================================================================
-# NiFi StatefulSet — ONE standalone node (NIFI_CLUSTER_IS_NODE=false).
-#
-# Why a StatefulSet for a single pod: stable identity (nifi-0) and a
-# volumeClaimTemplate whose PVC follows that identity across restarts and
-# reschedules. persistentVolumeClaimRetentionPolicy Retain/Retain keeps the PVC
-# even if the StatefulSet is deleted or scaled to 0 (on top of the StorageClass's
-# Retain, which keeps the EBS volume if the PVC itself is deleted).
-#
-# Storage layout: ONE PVC `data`; every NiFi directory that must survive a restart
-# is a subPath of it, mounted over /opt/nifi/nifi-current/<dir>.
-#
-# The `seed-conf` initContainer is REQUIRED: an empty PVC mounted over conf/ hides
-# the image's default config, and start.sh (which seds conf/nifi.properties)
-# then crashes. On first start the initContainer copies the image's conf/ onto
-# the volume; afterwards the `[ -f ... ] ||` guard makes it a no-op so the
-# runtime-modified conf/ (generated keystore/truststore, passwords) is preserved.
-#
-# Env vars are only read at start, so the pod template carries a
-# checksum/secret annotation: a credential change in values.yaml rolls the pod.
-#
-# Probes send `Host: localhost`: NiFi's generated self-signed cert has SANs
-# localhost + NIFI_WEB_PROXY_HOST, NOT the pod IP, and NiFi/Jetty answers 400 to
-# a Host it doesn't recognise. (kubelet does not verify the cert itself.)
-#
-# No PodDisruptionBudget on purpose — with one replica any PDB that protects the
-# pod (minAvailable 1) would block Auto Mode node drains/consolidation forever.
-# =============================================================================
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -49,24 +21,19 @@ spec:
         app.kubernetes.io/name: nifi
         app.kubernetes.io/part-of: nifi
       annotations:
-        # Roll the pod when credentials change (env vars are read only at start).
         checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
     spec:
-      # NiFi never talks to the Kubernetes API.
       automountServiceAccountToken: false
-      # Give NiFi time to flush repositories and shut down cleanly.
       terminationGracePeriodSeconds: 120
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000    # `nifi` user baked into apache/nifi
+        runAsUser: 1000
         runAsGroup: 1000
-        fsGroup: 1000      # makes the EBS volume (and its subPaths) writable by uid 1000
-        fsGroupChangePolicy: OnRootMismatch   # skip the recursive chown on every restart
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       initContainers:
-        # Seed conf/ on the PVC from the image ONCE (see header). Same image, so
-        # the defaults match the running NiFi version.
         - name: seed-conf
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -95,7 +62,6 @@ spec:
               containerPort: 8443
               protocol: TCP
           env:
-            # --- single-user auth + sensitive-props key (from nifi-credentials) ---
             - name: SINGLE_USER_CREDENTIALS_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -111,24 +77,16 @@ spec:
                 secretKeyRef:
                   name: nifi-credentials
                   key: sensitivePropsKey
-            # --- web ---
             - name: NIFI_WEB_HTTPS_PORT
               value: "8443"
-            # Default is $HOSTNAME, which binds only the pod IP and breaks
-            # `kubectl port-forward` (it connects via localhost inside the pod).
             - name: NIFI_WEB_HTTPS_HOST
               value: "0.0.0.0"
-            # Hosts NiFi accepts in the Host header (ALB forwards the browser's
-            # Host). Also become SANs of the self-signed cert generated on FIRST
-            # boot — must be right before the first start.
             - name: NIFI_WEB_PROXY_HOST
               value: "{{ .Values.host }},{{ .Values.host }}:443"
-            # --- JVM ---
             - name: NIFI_JVM_HEAP_INIT
               value: {{ .Values.jvm.heapInit | quote }}
             - name: NIFI_JVM_HEAP_MAX
               value: {{ .Values.jvm.heapMax | quote }}
-            # --- standalone ---
             - name: NIFI_CLUSTER_IS_NODE
               value: "false"
           resources:
@@ -138,8 +96,6 @@ spec:
             capabilities:
               drop:
                 - ALL
-          # First boot (keystore generation, NAR unpacking) can take minutes:
-          # allow up to 10 min (60 x 10s) before liveness/readiness kick in.
           startupProbe:
             httpGet:
               scheme: HTTPS
@@ -161,8 +117,6 @@ spec:
             periodSeconds: 15
             timeoutSeconds: 5
             failureThreshold: 4
-          # Liveness is a cheap TCP check: restarting NiFi is expensive, so only do
-          # it when Jetty stops accepting connections for ~3 min.
           livenessProbe:
             tcpSocket:
               port: 8443

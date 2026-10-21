@@ -1,74 +1,21 @@
-# =============================================================================
-# Values for the `nifi` chart — Apache NiFi 2.7.2 STANDALONE (one node, not a
-# cluster) on the tituseff-playground EKS Auto Mode cluster.
-#
-# Shape: one StatefulSet pod (official apache/nifi image) -> one encrypted gp3
-# EBS volume holding conf/ + every repository -> ClusterIP Service (port-forward)
-# -> optional internet-facing ALB Ingress (ACM cert on the ALB, HTTPS re-encrypt
-# to NiFi's own self-signed cert on :8443).
-# =============================================================================
-
-# Namespace everything namespaced lands in. A Namespace object (Pod Security
-# "restricted") is rendered so `helm template ... | kubectl apply -f -` is
-# self-contained; Argo CD also sets CreateNamespace=true on the child Application.
 namespace: nifi
 
-# --- NiFi image --------------------------------------------------------------
-# Official image (Docker Hub apache/nifi). Pin an explicit tag — NEVER :latest.
-# Upgrading: bump the tag AND diff conf/ defaults by hand — the seeded conf/ on the
-# PVC stays at the version that first started (see README "Caveats").
 image:
   repository: apache/nifi
   tag: "2.7.2"
   pullPolicy: IfNotPresent
 
-# --- Public host name ----------------------------------------------------------
-# The FQDN users type in the browser. Drives NIFI_WEB_PROXY_HOST ("<host>,<host>:443")
-# and the Ingress rule host.
-#
-# MUST BE CORRECT BEFORE THE FIRST START: on first boot NiFi generates its
-# self-signed keystore and puts the proxy hosts into the cert SANs. Changing this
-# later requires regenerating the cert (see README "Caveats").
 host: nifi.titusefferian.dev
 
-# =============================================================================
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# WARNING — PLAINTEXT CREDENTIALS IN GIT (PLAYGROUND ONLY)
-# These values are rendered into the `nifi-credentials` Secret and committed to
-# git in clear text. Anyone with read access to this repo can log in to NiFi and
-# decrypt sensitive flow properties. This was an explicit choice for the
-# playground — do NOT copy this pattern to a real environment (use External
-# Secrets / Sealed Secrets / SOPS instead).
-#
-# CHANGE THE PLACEHOLDERS BEFORE ENABLING THE CHART.
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#
-# NiFi's rules (start.sh) — violations fail SILENTLY: the pod starts but the
-# credentials are not applied. Check `kubectl -n nifi logs nifi-0 -c nifi | grep ERROR:`.
-#   - username           >= 4 characters
-#   - password           >= 12 characters
-#   - sensitivePropsKey  >= 12 characters, ALPHANUMERIC ONLY. start.sh writes it
-#                        into nifi.properties with `sed` using `|` as the
-#                        delimiter, so `|`, `&` or `\` corrupt nifi.properties.
-#
-# NEVER change sensitivePropsKey after the first start: it encrypts the sensitive
-# properties stored in the flow (flow.json.gz); a new key makes them undecryptable.
-# =============================================================================
 credentials:
-  username: admin                              # placeholder — change me
-  password: ChangeMe-NiFi-Pass1                # placeholder — change me (>= 12 chars)
-  sensitivePropsKey: ChangeMeSensitiveKey123   # placeholder — change me ONCE, before first start (alphanumeric, >= 12)
+  username: admin
+  password: ChangeMe-NiFi-Pass1
+  sensitivePropsKey: ChangeMeSensitiveKey123
 
-# --- JVM heap ------------------------------------------------------------------
-# NIFI_JVM_HEAP_INIT / NIFI_JVM_HEAP_MAX. Keep init == max (no heap resizing) and
-# leave ~half of the container memory limit for metaspace, direct buffers, the
-# OS page cache and Python processors.
 jvm:
   heapInit: 2g
   heapMax: 2g
 
-# Container resources. Memory request == limit (Guaranteed memory, no OOM surprise
-# from overcommit); no CPU limit (avoid CFS throttling of the JVM).
 resources:
   requests:
     cpu: "1"
@@ -76,41 +23,17 @@ resources:
   limits:
     memory: 4Gi
 
-# =============================================================================
-# Storage — ONE PVC (`data`) holds conf/, state/ and every repository, each via a
-# subPath. Split content/provenance onto their own volumes later if needed.
-# =============================================================================
 storage:
-  # A dedicated StorageClass is rendered by this chart (none exists in the cluster).
   storageClass:
     name: nifi-gp3
-    # Optional customer-managed KMS key (ARN) for the EBS volume. Empty = the AWS
-    # managed aws/ebs key. Volumes are always encrypted (encrypted: "true") because
-    # EBS encryption-by-default is OFF in this account.
     kmsKeyId: ""
-  # Size of the single data volume. gp3 can be grown later (allowVolumeExpansion).
   size: 100Gi
 
-# =============================================================================
-# Ingress — internet-facing ALB via the self-managed AWS LBC ('alb' IngressClass).
-# =============================================================================
 ingress:
-  # Default OFF: rendering FAILS (by design, via `required`) while certificateArn
-  # is empty, and that would break the Argo CD sync. Flip to true once the ACM
-  # certificate ARN below is set. Until then use port-forward (see README).
   enabled: false
 
-  # ACM certificate for `host` (nifi.titusefferian.dev) in ap-northeast-1, DNS-
-  # validated through the Route53 zone titusefferian.dev. Request it with:
-  #   aws acm request-certificate --domain-name nifi.titusefferian.dev \
-  #     --validation-method DNS --region ap-northeast-1
-  # create the validation CNAME in Route53, wait for ISSUED, then paste the ARN:
-  certificateArn: ""   # e.g. arn:aws:acm:ap-northeast-1:<acct>:certificate/<id>
+  certificateArn: ""
 
-  # Source CIDRs allowed to reach the ALB (comma-separated). 0.0.0.0/0 exposes the
-  # NiFi login page to the whole internet — STRONGLY recommended to narrow this,
-  # e.g. to your own IP: "203.0.113.10/32".
   inboundCidrs: "0.0.0.0/0"
 
-  # ALB TLS policy for the HTTPS:443 listener (TLS 1.3 + 1.2).
   sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06

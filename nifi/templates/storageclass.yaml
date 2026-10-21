@@ -1,20 +1,3 @@
-# =============================================================================
-# StorageClass for NiFi's data volume. The cluster (and this repo) ship NO
-# StorageClass, so this chart brings its own.
-#
-# - provisioner ebs.csi.eks.amazonaws.com: the EKS Auto Mode built-in EBS driver.
-#   NOT ebs.csi.aws.com (that is the self-managed EBS CSI add-on, not installed).
-# - gp3 + encrypted "true": EBS encryption-by-default is OFF in this account, so
-#   encryption must be requested explicitly. kmsKeyId only when set in values
-#   (empty = AWS managed aws/ebs key).
-# - reclaimPolicy Retain: deleting the PVC (or the whole app) keeps the EBS
-#   volume — NiFi's flow, state and repositories survive mistakes. The flip side:
-#   orphaned volumes must be deleted by hand (see README).
-# - WaitForFirstConsumer: the volume is created in the AZ the pod is scheduled to
-#   (EBS is AZ-scoped), instead of a random AZ the pod might not fit in.
-# - allowedTopologies eks.amazonaws.com/compute-type=auto: only Auto Mode nodes
-#   can mount volumes from the Auto Mode EBS driver.
-# =============================================================================
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:

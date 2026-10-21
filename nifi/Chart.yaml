@@ -3,12 +3,6 @@ name: nifi
 description: Apache NiFi 2.7.2 STANDALONE (single node, not clustered) on the tituseff-playground EKS Auto Mode cluster. One StatefulSet pod using the official apache/nifi image with single-user auth and NiFi's self-signed HTTPS cert, all repositories on one encrypted gp3 EBS volume (Retain), exposed via a ClusterIP Service (port-forward) and an optional internet-facing ALB Ingress (ACM cert, HTTPS re-encrypt to the pod). Raw manifests only — no upstream subchart.
 type: application
 
-# Version of THIS chart (bump on any change here).
 version: 0.1.0
 
-# Mirrors the pinned apache/nifi image tag shipped in values.yaml.
 appVersion: "2.7.2"
-
-# No dependencies: this chart renders plain Kubernetes objects (Namespace,
-# StorageClass, Secret, Services, StatefulSet, Ingress) from templates/ — same
-# style as `egress-test`.
