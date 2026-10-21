@@ -34,6 +34,8 @@ ingress:
 
   certificateArn: ""
 
+  loadBalancerName: tituseff-playground-nifi
+
   inboundCidrs: "0.0.0.0/0"
 
   sslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06

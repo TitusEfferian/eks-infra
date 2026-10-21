@@ -52,6 +52,7 @@ Edit `values.yaml` (every key is documented inline). The ones you'll usually set
 | `storage.storageClass.kmsKeyId` | optional CMK ARN for EBS encryption | `""` (aws/ebs key) |
 | `ingress.enabled` | render the ALB Ingress | `false` |
 | `ingress.certificateArn` | ACM cert ARN — **required** when the Ingress is enabled (render fails otherwise) | `""` |
+| `ingress.loadBalancerName` | fixed ALB name (≤ 32 chars); must match Terraform `nifi_alb_name` in the EKS repo. Only applied when the Ingress is created — changing it later requires deleting and recreating the Ingress (which creates a new ALB) | `tituseff-playground-nifi` |
 | `ingress.inboundCidrs` | source CIDRs allowed to reach the ALB — narrow this (e.g. your IP `/32`) | `0.0.0.0/0` |
 | `ingress.sslPolicy` | ALB TLS policy | `ELBSecurityPolicy-TLS13-1-2-2021-06` |
 
@@ -70,23 +71,16 @@ Edit `values.yaml` (every key is documented inline). The ones you'll usually set
 
 1. **Change the placeholder credentials** in `values.yaml` before enabling the
    chart (see the rules above).
-2. **ACM certificate** (only for the ALB) for `nifi.titusefferian.dev` in
-   `ap-northeast-1`, DNS-validated in the Route53 zone `titusefferian.dev`:
-   ```bash
-   aws acm request-certificate --domain-name nifi.titusefferian.dev \
-     --validation-method DNS --region ap-northeast-1
-   # get the validation CNAME name/value:
-   aws acm describe-certificate --region ap-northeast-1 --certificate-arn <arn> \
-     --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
-   ```
-   Create that CNAME in the `titusefferian.dev` hosted zone, wait for `ISSUED`,
-   then set `ingress.certificateArn: <arn>` and `ingress.enabled: true`.
+2. **ACM certificate** (only for the ALB) — managed by the EKS Terraform repo
+   ([TitusEfferian/EKS#14](https://github.com/TitusEfferian/EKS/pull/14)). Stage 1:
+   apply with `enable_nifi_ingress = true` to create the DNS-validated cert for
+   `nifi.titusefferian.dev`, then copy `terraform output nifi_acm_certificate_arn`
+   into `ingress.certificateArn` and set `ingress.enabled: true`.
 3. **Route53 alias record** (only for the ALB). There is **no ExternalDNS** in the
-   cluster, so once the ALB exists create an alias **A** record
-   `nifi.titusefferian.dev` → the ALB DNS name by hand:
-   ```bash
-   kubectl -n nifi get ingress nifi -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'; echo
-   ```
+   cluster; once the ALB exists, Stage 2 in the same Terraform repo
+   (`enable_nifi_dns = true`, `nifi_alb_name = "tituseff-playground-nifi"`) looks
+   up the ALB by `ingress.loadBalancerName` and creates the alias **A** record
+   `nifi.titusefferian.dev` → ALB.
 
 ## Install
 
