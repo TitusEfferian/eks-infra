@@ -50,7 +50,7 @@ resources:
 #   terraform output -raw node_iam_role_name  # (added to the EKS stack root outputs)
 # NOTE: this value is specific to the CURRENT cluster and changes every time the
 # cluster is rebuilt — re-read the Terraform output and update it after any rebuild.
-nodeRole: tituseff-playground-eks-auto-3e78f22fd5ca3378eb80607ab0
+nodeRole: tituseff-playground-eks-auto-397f22efa71afc45ed7a572b0b
 
 # Subnet the NodeClass pins nodes to. It MUST resolve to EXACTLY ONE subnet.
 #   - Production per-client path: leave `id` empty and select the dedicated
